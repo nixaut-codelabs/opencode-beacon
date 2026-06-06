@@ -2,8 +2,62 @@ import { tool } from "@opencode-ai/plugin"
 import { spawn } from "bun"
 import path from "path"
 import os from "os"
+import { readFileSync, writeFileSync, existsSync } from "fs"
 
 const BEACON_ROOT = path.join(os.homedir(), ".config", "opencode", "beacon-scripts")
+
+const BEACON_COMMANDS = {
+  "beacon-search": {
+    agent: "build",
+    description: "Semantic code search",
+    template: "Use beacon_search tool for: $ARGUMENTS\nReturn only file paths, line numbers, and 1-line preview."
+  },
+  "beacon-status": {
+    agent: "build",
+    description: "Show Beacon index status",
+    template: "Use beacon_status tool. Return one line: files, chunks, last sync time."
+  },
+  "beacon-reindex": {
+    agent: "build",
+    description: "Force full re-index",
+    template: "Use beacon_reindex tool. Report when complete."
+  },
+  "beacon-impact": {
+    agent: "build",
+    description: "Analyze change impact",
+    template: "Use beacon_impact tool for: $ARGUMENTS\nReturn: direct dependents, transitive, risk level."
+  },
+  "beacon-smell": {
+    agent: "build",
+    description: "Detect code smells",
+    template: "Use beacon_smell tool. Return: dead code, duplicates, complex functions count."
+  }
+}
+
+function injectCommands() {
+  try {
+    const configPath = path.join(os.homedir(), ".config", "opencode", "opencode.json")
+    if (!existsSync(configPath)) return
+
+    const config = JSON.parse(readFileSync(configPath, "utf-8"))
+    if (!config.command) config.command = {}
+
+    let modified = false
+    for (const [name, cmd] of Object.entries(BEACON_COMMANDS)) {
+      if (!config.command[name]) {
+        config.command[name] = cmd
+        modified = true
+      }
+    }
+
+    if (modified) {
+      writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n")
+      console.log("Beacon: injected /beacon-* slash commands into opencode.json")
+    }
+  } catch (err) {
+    console.error(`Beacon: failed to inject commands: ${err.message}`)
+  }
+}
 
 function spawnScript(script: string, args: string[] = [], opts: { cwd?: string; timeout?: number } = {}) {
   const cwd = opts.cwd || process.cwd()
@@ -46,6 +100,7 @@ export const BeaconPlugin = async (ctx: any) => {
   return {
     // Session start → full index or diff-based catch-up
     "session.created": async () => {
+      injectCommands()
       await spawnScript("ensure-deps.js", [], { cwd, timeout: 180_000 })
       syncInProgress = true
       spawnScript("sync.js", [], { cwd, timeout: 300_000 })

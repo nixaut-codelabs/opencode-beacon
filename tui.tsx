@@ -170,6 +170,80 @@ const tui: TuiPlugin = async (api, _options, _meta) => {
           setTimeout(() => api.ui.dialog.clear(), 8000)
         },
       },
+      {
+        title: "Beacon Search",
+        value: "beacon.search",
+        category: "Beacon",
+        description: "Semantic code search",
+        onSelect: () => {
+          api.ui.input.prompt({
+            placeholder: "Search query...",
+            onSubmit: async (query) => {
+              if (!query.trim()) return
+              api.ui.toast({
+                title: "Beacon",
+                message: `Searching for "${query}"...`,
+                variant: "info",
+                duration: 2000
+              })
+              // Use beacon_search tool via message
+              await api.message.send(`@beacon_search query="${query}"`)
+            }
+          })
+        },
+      },
+      {
+        title: "Beacon Reindex",
+        value: "beacon.reindex",
+        category: "Beacon",
+        description: "Force full re-index of codebase",
+        onSelect: async () => {
+          api.ui.toast({
+            title: "Beacon",
+            message: "Starting re-index...",
+            variant: "info",
+            duration: 3000
+          })
+          // Trigger reindex via message
+          await api.message.send("@beacon_reindex")
+        },
+      },
+      {
+        title: "Beacon Impact",
+        value: "beacon.impact",
+        category: "Beacon",
+        description: "Analyze change impact of a file",
+        onSelect: () => {
+          api.ui.input.prompt({
+            placeholder: "File path to analyze...",
+            onSubmit: async (file) => {
+              if (!file.trim()) return
+              api.ui.toast({
+                title: "Beacon",
+                message: `Analyzing impact of ${file}...`,
+                variant: "info",
+                duration: 2000
+              })
+              await api.message.send(`@beacon_impact file="${file}"`)
+            }
+          })
+        },
+      },
+      {
+        title: "Beacon Smell",
+        value: "beacon.smell",
+        category: "Beacon",
+        description: "Detect code smells",
+        onSelect: async () => {
+          api.ui.toast({
+            title: "Beacon",
+            message: "Scanning for code smells...",
+            variant: "info",
+            duration: 3000
+          })
+          await api.message.send("@beacon_smell")
+        },
+      },
     ])
     api.lifecycle.onDispose(dispose)
   }
