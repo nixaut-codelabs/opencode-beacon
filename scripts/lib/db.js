@@ -216,7 +216,7 @@ export class BeaconDatabase {
 
     // Stage 1: Parallel retrieval
     // Vector search — fetch extra candidates for re-ranking headroom
-    const vecResults = this._vectorSearchRaw(queryEmbedding, topK * 2, pathPrefix);
+    const vecResults = this._vectorSearchRaw(queryEmbedding, Math.max(topK * 10, 100), pathPrefix);
 
     // FTS search (tiered: AND-first for 3+ token queries, OR fallback)
     const ftsQuery = prepareFTSQuery(queryText);
@@ -329,7 +329,7 @@ export class BeaconDatabase {
 
   // Pure vector search (backward-compatible return format)
   _vectorSearch(queryEmbedding, topK, threshold, pathPrefix) {
-    const fetchLimit = pathPrefix ? topK * 4 : topK;
+    const fetchLimit = pathPrefix ? topK * 4 : Math.max(topK * 10, 100);
     const results = this.db.prepare(`
       SELECT
         chunks_vec.chunk_id,
