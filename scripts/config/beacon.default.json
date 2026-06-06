@@ -5,7 +5,7 @@
     "api_key_env": "",
     "dimensions": 768,
     "batch_size": 10,
-    "query_prefix": "",
+    "query_prefix": "search_query: ",
     "provider": "ollama"
   },
   "chunking": {
