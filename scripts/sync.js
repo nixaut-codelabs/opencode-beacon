@@ -12,6 +12,20 @@ import { extractIdentifiers } from './lib/tokenizer.js';
 import { isCwdBlacklisted } from './lib/safety.js';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
 import path from 'path';
+import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function writeStatus(status) {
+  try {
+    spawnSync(process.execPath, [path.join(__dirname, 'write-status.js'), status], {
+      cwd: process.cwd(),
+      stdio: 'ignore',
+      timeout: 5000,
+    });
+  } catch { /* ignore */ }
+}
 
 // Safety: refuse to index blacklisted paths
 if (isCwdBlacklisted()) {
@@ -102,6 +116,7 @@ try {
   // Mark sync as in-progress
   db.setSyncState('sync_status', 'in_progress');
   db.setSyncState('sync_started_at', syncStartTime);
+  writeStatus('syncing');
 
   const stats = db.getStats();
   const lastSyncTime = db.getSyncState('last_sync_time');
@@ -122,6 +137,7 @@ try {
 
     if (result.failed > 0) console.warn(`Beacon: ${result.failed} file(s) failed to index.`);
     console.log(`Beacon: initial index complete — ${result.indexed} files, ${db.getStats().chunkCount} chunks`);
+    writeStatus('idle');
   } else {
     // ── INCREMENTAL SYNC: only changed files ──
     const changedFiles = lastSyncTime
@@ -130,6 +146,7 @@ try {
 
     if (changedFiles.length === 0) {
       console.log(`Beacon: index up to date (${stats.fileCount} files, ${stats.chunkCount} chunks)`);
+      writeStatus('idle');
     } else {
       console.log(`Beacon: syncing ${changedFiles.length} changed files...`);
 
@@ -154,6 +171,7 @@ try {
 
       if (result.failed > 0) console.warn(`Beacon: ${result.failed} file(s) failed to sync.`);
       console.log(`Beacon: sync complete — ${changedFiles.length} files processed (${result.indexed} re-indexed)`);
+      writeStatus('idle');
     }
   }
 
