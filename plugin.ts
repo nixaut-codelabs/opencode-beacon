@@ -41,14 +41,21 @@ function spawnScript(script: string, args: string[] = [], opts: { cwd?: string; 
 
 export const BeaconPlugin = async (ctx: any) => {
   const cwd = ctx.directory || process.cwd()
+  let syncInProgress = false
 
   return {
     // Session start → full index or diff-based catch-up
     "session.created": async () => {
       await spawnScript("ensure-deps.js", [], { cwd, timeout: 180_000 })
-      spawnScript("sync.js", [], { cwd, timeout: 300_000 }).catch(err => {
-        console.error(`Beacon sync failed: ${err.message}`)
-      })
+      syncInProgress = true
+      spawnScript("sync.js", [], { cwd, timeout: 300_000 })
+        .then(() => {
+          syncInProgress = false
+        })
+        .catch(err => {
+          syncInProgress = false
+          console.error(`Beacon sync failed: ${err.message}`)
+        })
     },
 
     // File edited → re-embed that file
@@ -74,6 +81,26 @@ export const BeaconPlugin = async (ctx: any) => {
       const result = await spawnScript("status.js", ["--compact-warning"], { cwd, timeout: 5000 })
       if (result.stdout.trim()) {
         output.context?.push(result.stdout.trim())
+      }
+    },
+
+    // Event handler for notifications
+    event: async ({ event }: any) => {
+      // Show toast when session is idle and sync was in progress
+      if (event.type === "session.idle" && syncInProgress) {
+        const statusResult = await spawnScript("status.js", [], { cwd, timeout: 5000 })
+        if (statusResult.exitCode === 0) {
+          try {
+            const status = JSON.parse(statusResult.stdout)
+            return {
+              toast: {
+                title: "Beacon",
+                description: `Index ready: ${status.files_indexed} files, ${status.total_chunks} chunks`,
+                variant: "success",
+              }
+            }
+          } catch {}
+        }
       }
     },
 

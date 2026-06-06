@@ -32,8 +32,12 @@ Beacon indexes your codebase using embeddings and provides 15 powerful tools for
 ## Requirements
 
 - **OpenCode** — Latest version
-- **Ollama** — Running locally (`systemctl start ollama`)
-- **Embedding Model** — `nomic-embed-text-v2-moe` (recommended) or any Ollama embedding model
+- **Embedding API** — One of:
+  - **Ollama** (local, free) — `nomic-embed-text-v2-moe` or any Ollama embedding model
+  - **OpenAI** — `text-embedding-3-small` or `text-embedding-3-large`
+  - **Any OpenAI-compatible API** — Custom embedding endpoints
+
+### Ollama Setup (Local, Free)
 
 ```bash
 # Install Ollama (if not installed)
@@ -46,20 +50,31 @@ ollama pull nomic-embed-text-v2-moe
 sudo systemctl start ollama
 ```
 
+### OpenAI Setup
+
+```bash
+# Set your OpenAI API key
+export OPENAI_API_KEY="sk-..."
+```
+
+### Custom API Setup
+
+Any OpenAI-compatible embedding API works. Just configure in global config (see below).
+
 ## Installation
 
 ### Option 1: NPM (Recommended)
 
 ```bash
 # In your OpenCode project
-npm install opencode-auth
+npm install opencode-beacon
 ```
 
 Then add to `opencode.json`:
 
 ```json
 {
-  "plugin": ["opencode-auth"]
+  "plugin": ["opencode-beacon"]
 }
 ```
 
@@ -67,7 +82,7 @@ Then add to `opencode.json`:
 
 ```bash
 # Clone to OpenCode plugins directory
-git clone https://github.com/nixaut-codelabs/opencode-auth.git ~/.config/opencode/plugins/beacon
+git clone https://github.com/nixaut-codelabs/opencode-beacon.git ~/.config/opencode/plugins/beacon
 
 # Install dependencies
 cd ~/.config/opencode/plugins/beacon
@@ -128,24 +143,32 @@ Once installed, Beacon automatically indexes your codebase on session start. Use
 
 ## Configuration
 
-Create `.opencode/beacon.json` in your project:
+Beacon uses a 3-tier config system: **defaults** → **global** → **project** (project wins).
+
+### Global Config (Recommended)
+
+Platform-specific locations:
+
+| Platform | Path |
+|----------|------|
+| **Linux** | `~/.config/opencode/beacon.json` |
+| **macOS** | `~/Library/Application Support/opencode/beacon.json` |
+| **Windows** | `%APPDATA%/opencode/beacon.json` |
+
+Example global config:
 
 ```json
 {
   "embedding": {
+    "provider": "ollama",
     "api_base": "http://localhost:11434/v1",
     "model": "nomic-embed-text-v2-moe",
-    "dimensions": 768,
-    "batch_size": 10
+    "api_key_env": "",
+    "dimensions": 768
   },
   "search": {
     "top_k": 10,
-    "similarity_threshold": 0.25,
-    "hybrid": {
-      "bm25_weight": 0.3,
-      "vector_weight": 0.5,
-      "identifier_boost": 1.5
-    }
+    "similarity_threshold": 0.25
   },
   "storage": {
     "path": ".opencode/.beacon"
@@ -153,13 +176,89 @@ Create `.opencode/beacon.json` in your project:
 }
 ```
 
-### Global Config
+### Project Config
 
-For global settings, use `~/.config/opencode/beacon-global.json`.
+Create `.opencode/beacon.json` in your project root to override global settings:
+
+```json
+{
+  "embedding": {
+    "model": "text-embedding-3-small",
+    "dimensions": 1536
+  }
+}
+```
+
+### Embedding Providers
+
+#### Ollama (Local, Free)
+
+```json
+{
+  "embedding": {
+    "provider": "ollama",
+    "api_base": "http://localhost:11434/v1",
+    "model": "nomic-embed-text-v2-moe",
+    "api_key_env": "",
+    "dimensions": 768
+  }
+}
+```
+
+#### OpenAI
+
+```json
+{
+  "embedding": {
+    "provider": "openai",
+    "api_base": "https://api.openai.com/v1",
+    "model": "text-embedding-3-small",
+    "api_key_env": "OPENAI_API_KEY",
+    "dimensions": 1536
+  }
+}
+```
+
+Set your API key: `export OPENAI_API_KEY="sk-..."`
+
+#### Custom OpenAI-Compatible API
+
+Any API that implements `/v1/embeddings` endpoint:
+
+```json
+{
+  "embedding": {
+    "provider": "custom",
+    "api_base": "https://your-api.com/v1",
+    "model": "your-embedding-model",
+    "api_key_env": "YOUR_API_KEY_ENV_VAR",
+    "dimensions": 1024
+  }
+}
+```
+
+### Slash Commands
+
+Beacon adds these slash commands to OpenCode:
+
+| Command | Description |
+|---------|-------------|
+| `/beacon-search <query>` | Semantic code search |
+| `/beacon-status` | Show index status |
+| `/beacon-reindex` | Force full re-index |
+| `/beacon-impact <file>` | Analyze change impact |
+| `/beacon-smell` | Detect code smells |
+
+### Notifications
+
+Beacon shows toast notifications when:
+- Index is ready after session start
+- Re-index completes
+- Errors occur during sync
 
 ## How It Works
 
-1. **Indexing** — On session start, Beacon walks your codebase, chunks files, and generates embeddings via Ollama
+1. **Indexing** — On session start, Beacon walks your codebase, chunks files, and generates embeddings via configured API
 2. **Storage** — Embeddings stored in SQLite with `sqlite-vec` for fast vector search
 3. **Hybrid Search** — Combines vector similarity, BM25 keyword matching, and identifier boosting
 4. **Incremental Updates** — Only re-indexes changed files (tracked via git hash)
@@ -172,7 +271,7 @@ plugin.ts          → OpenCode plugin wrapper (15 tools)
 scripts/
 ├── lib/
 │   ├── db.js          → SQLite + sqlite-vec operations
-│   ├── embedder.js    → Ollama embedding API
+│   ├── embedder.js    → OpenAI-compatible embedding API
 │   ├── chunker.js     → Code chunking strategy
 │   ├── graph.js       → Dependency graph builder
 │   ├── patterns.js    → Code pattern definitions

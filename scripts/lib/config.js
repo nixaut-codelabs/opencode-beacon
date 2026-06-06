@@ -1,13 +1,29 @@
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { getRepoRoot } from './repo-root.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = process.env.BEACON_ROOT || path.resolve(__dirname, '..', '..');
 
+// Platform-specific global config paths
+function getGlobalConfigPath() {
+  const platform = process.platform;
+  const home = os.homedir();
+  
+  if (platform === 'win32') {
+    return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'opencode', 'beacon.json');
+  } else if (platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'opencode', 'beacon.json');
+  } else {
+    // Linux/Unix
+    return path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'opencode', 'beacon.json');
+  }
+}
+
 export function loadConfig() {
-  // Load defaults from plugin's config directory
+  // 1. Load defaults from plugin's config directory
   const defaultsPath = path.join(PLUGIN_ROOT, 'config', 'beacon.default.json');
   let defaults;
   try {
@@ -17,20 +33,33 @@ export function loadConfig() {
     process.exit(1);
   }
 
-  // Load user overrides from repo's .opencode/beacon.json (cwd = repo root)
-  const userConfigPath = path.join(getRepoRoot(), '.opencode', 'beacon.json');
-  let userConfig = {};
-  if (existsSync(userConfigPath)) {
+  // 2. Load global config (platform-specific)
+  const globalConfigPath = getGlobalConfigPath();
+  let globalConfig = {};
+  if (existsSync(globalConfigPath)) {
     try {
-      userConfig = JSON.parse(readFileSync(userConfigPath, 'utf-8'));
+      globalConfig = JSON.parse(readFileSync(globalConfigPath, 'utf-8'));
+    } catch (err) {
+      console.error(`Beacon: failed to parse global config (${globalConfigPath}): ${err.message}`);
+      // Continue with defaults
+    }
+  }
+
+  // 3. Load project config (repo's .opencode/beacon.json)
+  const projectConfigPath = path.join(getRepoRoot(), '.opencode', 'beacon.json');
+  let projectConfig = {};
+  if (existsSync(projectConfigPath)) {
+    try {
+      projectConfig = JSON.parse(readFileSync(projectConfigPath, 'utf-8'));
     } catch (err) {
       console.error(`Beacon: failed to parse .opencode/beacon.json: ${err.message}`);
       process.exit(1);
     }
   }
 
-  // Deep merge: defaults <- user config (user wins)
-  const merged = deepMerge(defaults, userConfig);
+  // Merge: defaults <- global <- project (project wins)
+  let merged = deepMerge(defaults, globalConfig);
+  merged = deepMerge(merged, projectConfig);
 
   // Resolve relative storage.path to repo root
   if (merged.storage?.path && !path.isAbsolute(merged.storage.path)) {

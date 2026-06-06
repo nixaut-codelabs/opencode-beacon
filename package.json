@@ -1,6 +1,6 @@
 {
-  "name": "opencode-auth",
-  "version": "1.0.0",
+  "name": "opencode-beacon",
+  "version": "1.1.0",
   "description": "Semantic code search plugin for OpenCode — find code by meaning, not just strings",
   "type": "module",
   "main": "plugin.ts",
@@ -19,12 +19,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nixaut-codelabs/opencode-auth"
+    "url": "https://github.com/nixaut-codelabs/opencode-beacon"
   },
   "bugs": {
-    "url": "https://github.com/nixaut-codelabs/opencode-auth/issues"
+    "url": "https://github.com/nixaut-codelabs/opencode-beacon/issues"
   },
-  "homepage": "https://github.com/nixaut-codelabs/opencode-auth#readme",
+  "homepage": "https://github.com/nixaut-codelabs/opencode-beacon#readme",
   "dependencies": {
     "better-sqlite3": "^11.10.0",
     "picomatch": "^4.0.0",
