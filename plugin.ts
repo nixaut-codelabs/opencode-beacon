@@ -1,10 +1,9 @@
 import { tool } from "@opencode-ai/plugin"
 import { spawn } from "bun"
 import path from "path"
-import { fileURLToPath } from "url"
+import os from "os"
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const BEACON_ROOT = path.join(__dirname, "scripts")
+const BEACON_ROOT = path.join(os.homedir(), ".config", "opencode", "beacon-scripts")
 
 function spawnScript(script: string, args: string[] = [], opts: { cwd?: string; timeout?: number } = {}) {
   const cwd = opts.cwd || process.cwd()
@@ -42,6 +41,7 @@ function spawnScript(script: string, args: string[] = [], opts: { cwd?: string; 
 export const BeaconPlugin = async (ctx: any) => {
   const cwd = ctx.directory || process.cwd()
   let syncInProgress = false
+  let lastSyncStatus: { files: number; chunks: number; time: string } | null = null
 
   return {
     // Session start → full index or diff-based catch-up
@@ -49,8 +49,20 @@ export const BeaconPlugin = async (ctx: any) => {
       await spawnScript("ensure-deps.js", [], { cwd, timeout: 180_000 })
       syncInProgress = true
       spawnScript("sync.js", [], { cwd, timeout: 300_000 })
-        .then(() => {
+        .then(async (result) => {
           syncInProgress = false
+          // Parse sync result for status
+          try {
+            const statusResult = await spawnScript("status.js", [], { cwd, timeout: 5000 })
+            if (statusResult.exitCode === 0) {
+              const status = JSON.parse(statusResult.stdout)
+              lastSyncStatus = {
+                files: status.files_indexed,
+                chunks: status.total_chunks,
+                time: status.last_sync,
+              }
+            }
+          } catch {}
         })
         .catch(err => {
           syncInProgress = false
@@ -84,23 +96,42 @@ export const BeaconPlugin = async (ctx: any) => {
       }
     },
 
-    // Event handler for notifications
+    // TUI toast - show Beacon status info
+    "tui.toast.show": async (input: any, output: any) => {
+      // Show sync status when session becomes idle
+      if (input?.event?.type === "session.idle" && lastSyncStatus) {
+        output.toasts = output.toasts || []
+        output.toasts.push({
+          title: "🔍 Beacon",
+          description: `Indexed ${lastSyncStatus.files} files, ${lastSyncStatus.chunks} chunks`,
+          variant: "info",
+          duration: 5000,
+        })
+      }
+    },
+
+    // Session status - show Beacon info in sidebar
+    "session.status": async (input: any, output: any) => {
+      if (lastSyncStatus) {
+        output.items = output.items || []
+        output.items.push({
+          label: "🔍 Beacon",
+          value: `${lastSyncStatus.files} files · ${lastSyncStatus.chunks} chunks`,
+        })
+      } else if (syncInProgress) {
+        output.items = output.items || []
+        output.items.push({
+          label: "🔍 Beacon",
+          value: "Indexing...",
+        })
+      }
+    },
+
+    // Event handler for session status
     event: async ({ event }: any) => {
-      // Show toast when session is idle and sync was in progress
+      // Log sync completion
       if (event.type === "session.idle" && syncInProgress) {
-        const statusResult = await spawnScript("status.js", [], { cwd, timeout: 5000 })
-        if (statusResult.exitCode === 0) {
-          try {
-            const status = JSON.parse(statusResult.stdout)
-            return {
-              toast: {
-                title: "Beacon",
-                description: `Index ready: ${status.files_indexed} files, ${status.total_chunks} chunks`,
-                variant: "success",
-              }
-            }
-          } catch {}
-        }
+        syncInProgress = false
       }
     },
 
