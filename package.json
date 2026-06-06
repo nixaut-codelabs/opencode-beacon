@@ -1,0 +1,41 @@
+{
+  "name": "opencode-auth",
+  "version": "1.0.0",
+  "description": "Semantic code search plugin for OpenCode — find code by meaning, not just strings",
+  "type": "module",
+  "main": "plugin.ts",
+  "keywords": [
+    "opencode",
+    "plugin",
+    "semantic-search",
+    "code-search",
+    "embeddings",
+    "vector-search",
+    "codebase",
+    "ai",
+    "llm"
+  ],
+  "author": "OpenCode Community",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nixaut-codelabs/opencode-auth"
+  },
+  "bugs": {
+    "url": "https://github.com/nixaut-codelabs/opencode-auth/issues"
+  },
+  "homepage": "https://github.com/nixaut-codelabs/opencode-auth#readme",
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "picomatch": "^4.0.0",
+    "sqlite-vec": "^0.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node scripts/search.js \"test query\"",
+    "sync": "node scripts/sync.js",
+    "status": "node scripts/status.js"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+.opencode/.beacon/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+*.log
+.env
+.env.local
+.npmrc
