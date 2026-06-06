@@ -1,0 +1,54 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Every day at 00:00 UTC
+  workflow_dispatch:      # Manual trigger
+  push:
+    branches: [master]    # Every push to master
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Get current version
+        id: version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          BASE_VERSION=$(echo $CURRENT_VERSION | sed 's/-nightly.*//')
+          DATE=$(date +%Y%m%d)
+          NIGHTLY_VERSION="${BASE_VERSION}-nightly.${DATE}"
+          echo "version=$NIGHTLY_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Update package.json version
+        run: npm version ${{ steps.version.outputs.version }} --no-git-tag-version --allow-same-version
+      
+      - name: Publish to npm (nightly tag)
+        run: npm publish --access public --tag nightly
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add package.json
+          git commit -m "chore: nightly build ${{ steps.version.outputs.version }}" || echo "No changes"
+          git push || echo "No changes"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
